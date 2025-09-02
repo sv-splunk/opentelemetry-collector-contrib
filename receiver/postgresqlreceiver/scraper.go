@@ -189,7 +189,8 @@ func (p *postgreSQLScraper) scrapeQuerySamples(ctx context.Context, maxRowsPerQu
 
 	defer dbClient.Close()
 
-	return p.lb.Emit(), nil
+	rb := p.setupResourceBuilder(p.lb.NewResourceBuilder())
+	return p.lb.Emit(metadata.WithLogsResource(rb.Emit())), nil
 }
 
 func (p *postgreSQLScraper) scrapeTopQuery(ctx context.Context, maxRowsPerQuery, topNQuery, maxExplainEachInterval int64) (plog.Logs, error) {
@@ -197,7 +198,8 @@ func (p *postgreSQLScraper) scrapeTopQuery(ctx context.Context, maxRowsPerQuery,
 
 	p.collectTopQuery(ctx, p.clientFactory, maxRowsPerQuery, topNQuery, maxExplainEachInterval, &errs, p.logger)
 
-	return p.lb.Emit(), nil
+	rb := p.setupResourceBuilder(p.lb.NewResourceBuilder())
+	return p.lb.Emit(metadata.WithLogsResource(rb.Emit())), nil
 }
 
 func (p *postgreSQLScraper) collectQuerySamples(ctx context.Context, dbClient client, limit int64, mux *errsMux, logger *zap.Logger) {
@@ -696,4 +698,12 @@ func (*postgreSQLScraper) retrieveBackends(
 	r.Lock()
 	r.activityMap = activityByDB
 	r.Unlock()
+}
+
+func (s *postgreSQLScraper) setupResourceBuilder(rb *metadata.ResourceBuilder) *metadata.ResourceBuilder {
+	rb.SetServiceInstanceID("find the service id :)") //TODO
+	// rb.SetOracledbInstanceName(s.instanceName)
+	// rb.SetHostName(s.hostName)
+	// rb.SetServiceInstanceID(s.serviceInstanceID)
+	return rb
 }

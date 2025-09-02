@@ -455,3 +455,4 @@ top query
 | postgresql.index.name | The name of the index on a table. | Any Str | true |
 | postgresql.schema.name | The schema name. | Any Str | true |
 | postgresql.table.name | The table name. | Any Str | true |
+| service.instance.id | A unique identifier of the Oracle db instance in the format host:port | Any Str | true |
