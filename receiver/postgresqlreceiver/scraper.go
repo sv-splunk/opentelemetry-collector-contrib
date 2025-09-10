@@ -8,6 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,6 +54,7 @@ type postgreSQLScraper struct {
 	separateSchemaAttr   bool
 	queryPlanCache       *expirable.LRU[string, string]
 	newestQueryTimestamp float64
+	serviceInstanceID    string
 }
 
 type errsMux struct {
@@ -105,6 +109,7 @@ func newPostgreSQLScraper(
 		cache:              cache,
 		queryPlanCache:     queryPlanCache,
 		separateSchemaAttr: separateSchemaAttr,
+		serviceInstanceID:  getInstanceID(config.AddrConfig.Endpoint, settings.Logger),
 	}
 }
 
@@ -299,7 +304,7 @@ func (p *postgreSQLScraper) collectTopQuery(ctx context.Context, clientFactory p
 			}
 			finalValue := float64(0)
 			if valDelta > 0 {
-				p.cache.Add(queryID.(string)+columnName, valDelta)
+				p.cache.Add(queryID.(string)+columnName, valInAtts)
 				finalValue = valDelta
 			}
 			if info.finalConverter != nil {
@@ -701,9 +706,32 @@ func (*postgreSQLScraper) retrieveBackends(
 }
 
 func (s *postgreSQLScraper) setupResourceBuilder(rb *metadata.ResourceBuilder) *metadata.ResourceBuilder {
-	rb.SetServiceInstanceID("find the service id :)") //TODO
-	// rb.SetOracledbInstanceName(s.instanceName)
-	// rb.SetHostName(s.hostName)
-	// rb.SetServiceInstanceID(s.serviceInstanceID)
+	rb.SetServiceInstanceID(s.serviceInstanceID)
 	return rb
+}
+
+func getInstanceID(instanceString string, logger *zap.Logger) string {
+	host, port, err := net.SplitHostPort(instanceString)
+	if err != nil {
+		return handleInstanceIDErr(err, logger, port)
+	}
+
+	if strings.EqualFold(host, "localhost") || net.ParseIP(host).IsLoopback() {
+		host, err = os.Hostname()
+	}
+	if err != nil {
+		return handleInstanceIDErr(err, logger, port)
+	}
+
+	return host + ":" + port
+}
+
+func handleInstanceIDErr(err error, logger *zap.Logger, port string) string {
+	const fallback = "unknown:1521"
+
+	logger.Warn("Failed to compute service.instance.id", zap.Error(err))
+	if port == "" {
+		return fallback
+	}
+	return "unknown:" + port
 }
