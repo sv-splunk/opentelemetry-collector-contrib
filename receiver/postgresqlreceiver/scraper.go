@@ -178,7 +178,9 @@ func (p *postgreSQLScraper) scrape(ctx context.Context) (pmetric.Metrics, error)
 	p.collectMaxConnections(ctx, now, listClient, &errs)
 	p.collectDatabaseLocks(ctx, now, listClient, &errs)
 
-	return p.mb.Emit(), errs.combine()
+	rb := p.setupResourceBuilder(p.lb.NewResourceBuilder())
+
+	return p.mb.Emit(metadata.WithResource(rb.Emit())), errs.combine()
 }
 
 func (p *postgreSQLScraper) scrapeQuerySamples(ctx context.Context, maxRowsPerQuery int64) (plog.Logs, error) {
