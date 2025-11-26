@@ -62,6 +62,7 @@ type sqlServerScraperHelper struct {
 	mb                     *metadata.MetricsBuilder
 	lb                     *metadata.LogsBuilder
 	cache                  *lru.Cache[string, int64]
+	planCache              *lru.Cache[string, string]
 	lastExecutionTimestamp time.Time
 	obfuscator             *obfuscator
 	serviceInstanceID      string
@@ -80,6 +81,7 @@ func newSQLServerScraper(id component.ID,
 	params receiver.Settings,
 	cfg *Config,
 	cache *lru.Cache[string, int64],
+	planCache *lru.Cache[string, string],
 ) *sqlServerScraperHelper {
 	// Compute service instance ID
 	serviceInstanceID, err := computeServiceInstanceID(cfg)
@@ -99,6 +101,7 @@ func newSQLServerScraper(id component.ID,
 		mb:                     metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, params),
 		lb:                     metadata.NewLogsBuilder(cfg.LogsBuilderConfig, params),
 		cache:                  cache,
+		planCache:              planCache,
 		lastExecutionTimestamp: time.Unix(0, 0),
 		obfuscator:             newObfuscator(),
 		serviceInstanceID:      serviceInstanceID,
@@ -685,6 +688,7 @@ func (s *sqlServerScraperHelper) recordDatabaseQueryTextAndPlan(ctx context.Cont
 	now := time.Now()
 	timestamp := pcommon.NewTimestampFromTime(now)
 	s.lastExecutionTimestamp = now
+	s.logger.Debug("Current planCache size: " + strconv.Itoa(s.planCache.Len()))
 	for i, row := range rows {
 		// skipping the rest of the rows as totalElapsedTimeDiffs is sorted in descending order
 		if totalElapsedTimeDiffsMicrosecond[i] == 0 {
@@ -695,6 +699,8 @@ func (s *sqlServerScraperHelper) recordDatabaseQueryTextAndPlan(ctx context.Cont
 		// reporting human-readable query hash and query hash plan
 		queryHashVal := hex.EncodeToString([]byte(row[queryHash]))
 		queryPlanHashVal := hex.EncodeToString([]byte(row[queryPlanHash]))
+
+		isNewPlan := s.cacheIfNewPlan(queryHashVal, queryPlanHashVal)
 
 		queryTextVal := s.retrieveValue(row, queryText, &errs, func(row sqlquery.StringMap, columnName string) (any, error) {
 			statement := row[columnName]
@@ -731,9 +737,12 @@ func (s *sqlServerScraperHelper) recordDatabaseQueryTextAndPlan(ctx context.Cont
 			physicalReadsVal = int64(0)
 		}
 
-		queryPlanVal := s.retrieveValue(row, queryPlan, &errs, func(row sqlquery.StringMap, columnName string) (any, error) {
-			return s.obfuscator.obfuscateXMLPlan(row[columnName])
-		})
+		var queryPlanVal any = ""
+		if isNewPlan {
+			queryPlanVal = s.retrieveValue(row, queryPlan, &errs, func(row sqlquery.StringMap, columnName string) (any, error) {
+				return s.obfuscator.obfuscateXMLPlan(row[columnName])
+			})
+		}
 
 		rowsReturnedVal := s.retrieveValue(row, rowsReturned, &errs, retrieveInt)
 		cached, rowsReturnedVal = s.cacheAndDiff(queryHashVal, queryPlanHashVal, rowsReturned, rowsReturnedVal.(int64))
@@ -785,6 +794,15 @@ func (s *sqlServerScraperHelper) recordDatabaseQueryTextAndPlan(ctx context.Cont
 			dbSystemNameVal)
 	}
 	return resources, errors.Join(errs...)
+}
+
+func (s *sqlServerScraperHelper) cacheIfNewPlan(queryHashVal string, queryPlanHashVal string) bool {
+	cachedPlanHashValue, isPlanHashPresent := s.planCache.Get(queryHashVal)
+	if !isPlanHashPresent || cachedPlanHashValue != queryPlanHashVal {
+		s.planCache.Add(queryHashVal, queryPlanHashVal)
+		return true
+	}
+	return false
 }
 
 func (s *sqlServerScraperHelper) retrieveValue(

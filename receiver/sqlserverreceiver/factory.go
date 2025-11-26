@@ -132,6 +132,7 @@ func setupSQLServerScrapers(params receiver.Settings, cfg *Config) []*sqlServerS
 
 		// lru only returns error when the size is less than 0
 		cache := newCache(1)
+		planCache, _ := lru.New[string, string](1)
 
 		sqlServerScraper := newSQLServerScraper(id, query,
 			sqlquery.TelemetryConfig{},
@@ -139,7 +140,8 @@ func setupSQLServerScrapers(params receiver.Settings, cfg *Config) []*sqlServerS
 			sqlquery.NewDbClient,
 			params,
 			cfg,
-			cache)
+			cache,
+			planCache)
 
 		scrapers = append(scrapers, sqlServerScraper)
 	}
@@ -172,6 +174,7 @@ func setupSQLServerLogsScrapers(params receiver.Settings, cfg *Config) []*sqlSer
 		id := component.NewIDWithName(metadata.Type, fmt.Sprintf("logs-query-%d: %s", i, query))
 
 		cache := newCache(1)
+		planCache, _ := lru.New[string, string](int(cfg.MaxQuerySampleCount))
 
 		if query == getSQLServerQueryTextAndPlanQuery() {
 			// we have 8 metrics in this query and multiple 2 to allow to cache more queries.
@@ -188,7 +191,8 @@ func setupSQLServerLogsScrapers(params receiver.Settings, cfg *Config) []*sqlSer
 			sqlquery.NewDbClient,
 			params,
 			cfg,
-			cache)
+			cache,
+			planCache)
 
 		scrapers = append(scrapers, sqlServerScraper)
 	}
