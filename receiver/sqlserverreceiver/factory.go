@@ -24,7 +24,7 @@ import (
 
 var errConfigNotSQLServer = errors.New("config was not a sqlserver receiver config")
 
-// newCache creates a new cache with the given size.
+// newCache creates a new metricCache with the given size.
 // If the size is less or equal to 0, it will be set to 1.
 // It will never return an error.
 func newCache(size int) *lru.Cache[string, int64] {
@@ -131,7 +131,7 @@ func setupSQLServerScrapers(params receiver.Settings, cfg *Config) []*sqlServerS
 		id := component.NewIDWithName(metadata.Type, fmt.Sprintf("query-%d: %s", i, query))
 
 		// lru only returns error when the size is less than 0
-		cache := newCache(1)
+		metricCache := newCache(1)
 		planCache, _ := lru.New[string, string](1)
 
 		sqlServerScraper := newSQLServerScraper(id, query,
@@ -140,7 +140,7 @@ func setupSQLServerScrapers(params receiver.Settings, cfg *Config) []*sqlServerS
 			sqlquery.NewDbClient,
 			params,
 			cfg,
-			cache,
+			metricCache,
 			planCache)
 
 		scrapers = append(scrapers, sqlServerScraper)

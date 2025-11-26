@@ -61,7 +61,7 @@ type sqlServerScraperHelper struct {
 	db                     *sql.DB
 	mb                     *metadata.MetricsBuilder
 	lb                     *metadata.LogsBuilder
-	cache                  *lru.Cache[string, int64]
+	metricCache            *lru.Cache[string, int64]
 	planCache              *lru.Cache[string, string]
 	lastExecutionTimestamp time.Time
 	obfuscator             *obfuscator
@@ -80,7 +80,7 @@ func newSQLServerScraper(id component.ID,
 	clientProviderFunc sqlquery.ClientProviderFunc,
 	params receiver.Settings,
 	cfg *Config,
-	cache *lru.Cache[string, int64],
+	metricCache *lru.Cache[string, int64],
 	planCache *lru.Cache[string, string],
 ) *sqlServerScraperHelper {
 	// Compute service instance ID
@@ -100,7 +100,7 @@ func newSQLServerScraper(id component.ID,
 		clientProviderFunc:     clientProviderFunc,
 		mb:                     metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, params),
 		lb:                     metadata.NewLogsBuilder(cfg.LogsBuilderConfig, params),
-		cache:                  cache,
+		metricCache:            metricCache,
 		planCache:              planCache,
 		lastExecutionTimestamp: time.Unix(0, 0),
 		obfuscator:             newObfuscator(),
@@ -830,14 +830,14 @@ func (s *sqlServerScraperHelper) cacheAndDiff(queryHash, queryPlanHash, column s
 
 	key := queryHash + "-" + queryPlanHash + "-" + column
 
-	cached, ok := s.cache.Get(key)
+	cached, ok := s.metricCache.Get(key)
 	if !ok {
-		s.cache.Add(key, val)
+		s.metricCache.Add(key, val)
 		return false, val
 	}
 
 	if val > cached {
-		s.cache.Add(key, val)
+		s.metricCache.Add(key, val)
 		return true, val - cached
 	}
 

@@ -388,7 +388,7 @@ func TestQueryTextAndPlanQuery(t *testing.T) {
 	assert.NotNil(t, scrapers)
 
 	scraper := scrapers[0]
-	assert.NotNil(t, scraper.cache)
+	assert.NotNil(t, scraper.metricCache)
 
 	const totalElapsedTime = "total_elapsed_time"
 	const rowsReturned = "total_rows"
@@ -447,7 +447,7 @@ func TestInvalidQueryTextAndPlanQuery(t *testing.T) {
 	assert.NotNil(t, scrapers)
 
 	scraper := scrapers[0]
-	assert.NotNil(t, scraper.cache)
+	assert.NotNil(t, scraper.metricCache)
 
 	const totalElapsedTime = "total_elapsed_time"
 	const rowsReturned = "total_rows"
@@ -543,7 +543,7 @@ func TestRecordDatabaseSampleQuery(t *testing.T) {
 			assert.NotNil(t, scrapers)
 
 			scraper := scrapers[0]
-			assert.NotNil(t, scraper.cache)
+			assert.NotNil(t, scraper.metricCache)
 
 			scraper.client = tc.mockClient(scraper.instanceName, scraper.sqlQuery)
 
