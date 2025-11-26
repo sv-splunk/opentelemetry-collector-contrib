@@ -494,6 +494,48 @@ func TestInvalidQueryTextAndPlanQuery(t *testing.T) {
 	assert.NoError(t, errs)
 }
 
+func TestCacheIfNewPlan(t *testing.T) {
+	cfg := createDefaultConfig().(*Config)
+	cfg.Username = "sa"
+	cfg.Password = "password"
+	cfg.Port = 1433
+	cfg.Server = "0.0.0.0"
+	cfg.MetricsBuilderConfig.ResourceAttributes.SqlserverInstanceName.Enabled = true
+	cfg.Events.DbServerTopQuery.Enabled = true
+	assert.NoError(t, cfg.Validate())
+
+	configureAllScraperMetricsAndEvents(cfg, false)
+	cfg.Events.DbServerTopQuery.Enabled = true
+	cfg.TopQueryCollection.CollectionInterval = cfg.ControllerConfig.CollectionInterval
+
+	scrapers := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	assert.NotNil(t, scrapers)
+
+	scraper := scrapers[0]
+	assert.NotNil(t, scraper.planCache)
+
+	scraper.planCache.Add("query-hash-1", "plan-hash-1")
+
+	//Test existing values.
+	isPlan1New := scraper.cacheIfNewPlan("query-hash-1", "plan-hash-1")
+	assert.False(t, isPlan1New, "Should be False because query-hash-1 already exists in the cache")
+	value1, _ := scraper.planCache.Get("query-hash-1")
+	assert.Equal(t, "plan-hash-1", value1, "The existing value in cache should be 'plan-hash-1'")
+
+	//Test adding new values.
+	isPlan2New := scraper.cacheIfNewPlan("query-hash-2", "plan-hash-2")
+	assert.True(t, isPlan2New, "Should be true because 'query-hash-2' does not already exist")
+	value2, _ := scraper.planCache.Get("query-hash-2")
+	assert.Equal(t, "plan-hash-2", value2, "The new 'plan-hash-2' should have added into the cache")
+
+	//Test updating existing values.
+	isPlan3New := scraper.cacheIfNewPlan("query-hash-1", "plan-hash-3")
+	assert.True(t, isPlan3New, "Should be true because plan hash 'plan-hash-3' is new for 'query-hash-1'")
+	value3, _ := scraper.planCache.Get("query-hash-1")
+	assert.Equal(t, "plan-hash-3", value3, "The value for key 'query-hash-1' should be now updated to 'plan-hash-3'")
+
+}
+
 func TestRecordDatabaseSampleQuery(t *testing.T) {
 	tests := map[string]struct {
 		expectedFile string
