@@ -16,6 +16,7 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/featuregate"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -62,7 +63,7 @@ type sqlServerScraperHelper struct {
 	mb                     *metadata.MetricsBuilder
 	lb                     *metadata.LogsBuilder
 	metricCache            *lru.Cache[string, int64]
-	planCache              *lru.Cache[string, string]
+	planCache              *expirable.LRU[string, string]
 	lastExecutionTimestamp time.Time
 	obfuscator             *obfuscator
 	serviceInstanceID      string
@@ -81,7 +82,7 @@ func newSQLServerScraper(id component.ID,
 	params receiver.Settings,
 	cfg *Config,
 	metricCache *lru.Cache[string, int64],
-	planCache *lru.Cache[string, string],
+	planCache *expirable.LRU[string, string],
 ) *sqlServerScraperHelper {
 	// Compute service instance ID
 	serviceInstanceID, err := computeServiceInstanceID(cfg)

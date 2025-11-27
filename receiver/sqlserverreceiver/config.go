@@ -30,6 +30,7 @@ type TopQueryCollection struct {
 	MaxQuerySampleCount uint          `mapstructure:"max_query_sample_count"`
 	TopQueryCount       uint          `mapstructure:"top_query_count"`
 	CollectionInterval  time.Duration `mapstructure:"collection_interval"`
+	QueryPlanCacheTTL   time.Duration `mapstructure:"query_plan_cache_ttl"`
 }
 
 // Config defines configuration for a sqlserver receiver.

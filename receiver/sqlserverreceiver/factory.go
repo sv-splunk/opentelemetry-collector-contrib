@@ -11,6 +11,7 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	_ "github.com/microsoft/go-mssqldb"                     // register Db driver
 	_ "github.com/microsoft/go-mssqldb/integratedauth/krb5" // register Db driver
 	"go.opentelemetry.io/collector/component"
@@ -59,6 +60,7 @@ func createDefaultConfig() component.Config {
 			MaxQuerySampleCount: 1000,
 			TopQueryCount:       200,
 			CollectionInterval:  time.Minute,
+			QueryPlanCacheTTL:   time.Hour,
 		},
 	}
 }
@@ -132,7 +134,7 @@ func setupSQLServerScrapers(params receiver.Settings, cfg *Config) []*sqlServerS
 
 		// lru only returns error when the size is less than 0
 		metricCache := newCache(1)
-		planCache, _ := lru.New[string, string](1)
+		planCache := expirable.NewLRU[string, string](1, nil, time.Second)
 
 		sqlServerScraper := newSQLServerScraper(id, query,
 			sqlquery.TelemetryConfig{},
@@ -174,7 +176,7 @@ func setupSQLServerLogsScrapers(params receiver.Settings, cfg *Config) []*sqlSer
 		id := component.NewIDWithName(metadata.Type, fmt.Sprintf("logs-query-%d: %s", i, query))
 
 		cache := newCache(1)
-		planCache, _ := lru.New[string, string](int(cfg.MaxQuerySampleCount))
+		planCache := expirable.NewLRU[string, string](1, nil, cfg.TopQueryCollection.QueryPlanCacheTTL)
 
 		if query == getSQLServerQueryTextAndPlanQuery() {
 			// we have 8 metrics in this query and multiple 2 to allow to cache more queries.
