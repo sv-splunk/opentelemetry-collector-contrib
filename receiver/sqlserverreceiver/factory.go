@@ -57,10 +57,10 @@ func createDefaultConfig() component.Config {
 			MaxRowsPerQuery: 100,
 		},
 		TopQueryCollection: TopQueryCollection{
-			MaxQuerySampleCount: 1000,
-			TopQueryCount:       200,
-			CollectionInterval:  time.Minute,
-			QueryPlanCacheTTL:   time.Hour,
+			MaxQuerySampleCount:    1000,
+			TopQueryCount:          200,
+			CollectionInterval:     time.Minute,
+			QueryPlanCacheDuration: time.Hour,
 		},
 	}
 }
@@ -176,7 +176,7 @@ func setupSQLServerLogsScrapers(params receiver.Settings, cfg *Config) []*sqlSer
 		id := component.NewIDWithName(metadata.Type, fmt.Sprintf("logs-query-%d: %s", i, query))
 
 		cache := newCache(1)
-		planCache := expirable.NewLRU[string, string](1, nil, cfg.TopQueryCollection.QueryPlanCacheTTL)
+		planCache := expirable.NewLRU[string, string](1, nil, cfg.TopQueryCollection.QueryPlanCacheDuration)
 
 		if query == getSQLServerQueryTextAndPlanQuery() {
 			// we have 8 metrics in this query and multiple 2 to allow to cache more queries.

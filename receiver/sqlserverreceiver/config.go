@@ -26,11 +26,11 @@ type TopQueryCollection struct {
 	// The query statement will also be reported, hence, it is not ideal to send it as a metric. Hence
 	// we are reporting them as logs.
 	// The `N` is configured via `TopQueryCount`
-	LookbackTime        time.Duration `mapstructure:"lookback_time"`
-	MaxQuerySampleCount uint          `mapstructure:"max_query_sample_count"`
-	TopQueryCount       uint          `mapstructure:"top_query_count"`
-	CollectionInterval  time.Duration `mapstructure:"collection_interval"`
-	QueryPlanCacheTTL   time.Duration `mapstructure:"query_plan_cache_ttl"`
+	LookbackTime           time.Duration `mapstructure:"lookback_time"`
+	MaxQuerySampleCount    uint          `mapstructure:"max_query_sample_count"`
+	TopQueryCount          uint          `mapstructure:"top_query_count"`
+	CollectionInterval     time.Duration `mapstructure:"collection_interval"`
+	QueryPlanCacheDuration time.Duration `mapstructure:"query_plan_cache_duration"`
 }
 
 // Config defines configuration for a sqlserver receiver.
