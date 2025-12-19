@@ -708,8 +708,16 @@ func (s *sqlServerScraperHelper) recordDatabaseQueryTextAndPlan(ctx context.Cont
 		})
 
 		executionCountVal := s.retrieveValue(row, executionCount, &errs, retrieveInt)
+
+		cached1, ok := s.cache.Get(queryHashVal + "-" + queryPlanHashVal + "-" + executionCount)
+		x := cached1
+		s.logger.Info(">>>>>>>>>>> value in cache,ok,  queryHash: " + strconv.Itoa(int(x)) + "---" + strconv.FormatBool(ok) + "----" + queryHash)
+
 		cached, executionCountVal := s.cacheAndDiff(queryHashVal, queryPlanHashVal, executionCount, executionCountVal.(int64))
+		x1, _ := executionCountVal.(int64)
+		s.logger.Info(">>>>>>>>>>> current executionCountVal, queryHashVal: " + strconv.Itoa(int(x1)) + "----" + queryHashVal)
 		if !cached {
+			s.logger.Info(">>>>>>>>>>> setting executionCountVal to 0, queryHashVal: " + queryHashVal)
 			executionCountVal = int64(0)
 		}
 
