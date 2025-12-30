@@ -752,7 +752,7 @@ func (s *sqlServerScraperHelper) recordDatabaseQueryTextAndPlan(ctx context.Cont
 			totalWorkerTimeValDiff = float64(totalWorkerTimeValCached) / 1_000_000
 		}
 
-		totalElapsedTimeVal := s.retrieveValue(row, totalElapsedTime, &errs, retrieveInt)
+		totalElapsedTimeVal := s.retrieveValue(row, totalElapsedTime, &errs, retrieveFloat).(float64) / 1_000_000
 
 		// If execution count in the db is 1 that would mean there is no past records to compare with.
 		// We just send down the metrics corresponding to that single execution as it is.
@@ -765,7 +765,7 @@ func (s *sqlServerScraperHelper) recordDatabaseQueryTextAndPlan(ctx context.Cont
 			rowsReturnedVal = rowsReturnedValDiff
 			totalGrantVal = totalGrantValDiff
 			totalWorkerTimeVal = totalWorkerTimeValDiff
-			totalElapsedTimeVal = int64(totalElapsedTimeValDiff)
+			totalElapsedTimeVal = totalElapsedTimeValDiff
 		}
 
 		if totalElapsedTimeDiffsMicrosecond[i] == 0 {
@@ -800,7 +800,7 @@ func (s *sqlServerScraperHelper) recordDatabaseQueryTextAndPlan(ctx context.Cont
 			queryPlanVal.(string),
 			queryPlanHashVal,
 			rowsReturnedVal.(int64),
-			float64(totalElapsedTimeVal.(int64)),
+			totalElapsedTimeVal,
 			totalGrantVal.(int64),
 			s.config.Server,
 			int64(s.config.Port),
@@ -835,16 +835,13 @@ func (s *sqlServerScraperHelper) cacheAndDiff(queryHash, queryPlanHash, column s
 	key := queryHash + "-" + queryPlanHash + "-" + column
 
 	cached, ok := s.cache.Get(key)
+	s.cache.Add(key, val)
 	if !ok {
-		s.cache.Add(key, val)
 		return false, val
 	}
 
 	if val > cached {
-		s.cache.Add(key, val)
 		return true, val - cached
-	} else {
-		s.cache.Add(key, val)
 	}
 
 	return true, 0
