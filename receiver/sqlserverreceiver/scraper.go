@@ -768,11 +768,8 @@ func (s *sqlServerScraperHelper) recordDatabaseQueryTextAndPlan(ctx context.Cont
 			totalElapsedTimeVal = totalElapsedTimeValDiff
 		}
 
-		if totalElapsedTimeDiffsMicrosecond[i] == 0 {
-			continue
-		}
-
-		if val, ok := executionCountVal.(int64); ok && val == 0 {
+		execCountval, ok := executionCountVal.(int64)
+		if totalElapsedTimeVal == 0 || (ok && execCountval == 0) {
 			continue
 		}
 
