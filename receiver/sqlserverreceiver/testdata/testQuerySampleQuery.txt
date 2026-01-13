@@ -1,4 +1,5 @@
 SELECT TOP(@top)
+  ISNULL(qp.query_plan, '') AS query_plan,
   REPLACE(@@SERVERNAME,'\',':') AS [sql_instance],
   HOST_NAME() AS [computer_name],
   DB_NAME(r.database_id) AS db_name,
@@ -43,4 +44,5 @@ SELECT TOP(@top)
 FROM sys.dm_exec_requests r
 INNER JOIN sys.dm_exec_sessions s ON r.session_id = s.session_id
 INNER JOIN sys.dm_exec_connections c ON s.session_id = c.session_id
-CROSS APPLY sys.dm_exec_sql_text(r.plan_handle) AS o;
+CROSS APPLY sys.dm_exec_sql_text(r.plan_handle) AS o
+CROSS APPLY sys.dm_exec_query_plan(r.plan_handle) AS qp;
