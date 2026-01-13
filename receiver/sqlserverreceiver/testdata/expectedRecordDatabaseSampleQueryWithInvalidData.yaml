@@ -4,15 +4,15 @@ resourceLogs:
         - key: host.name
           value:
             stringValue: 0.0.0.0
-        - key: service.instance.id
-          value:
-            stringValue: 0.0.0.0:1433
         - key: sqlserver.computer.name
           value:
             stringValue: DESKTOP-GHAEGRD
         - key: sqlserver.instance.name
           value:
             stringValue: sqlserver
+        - key: service.instance.id
+          value:
+            stringValue: 0.0.0.0:1433
     scopeLogs:
       - logRecords:
           - attributes:
@@ -73,6 +73,9 @@ resourceLogs:
               - key: sqlserver.query_plan_hash
                 value:
                   stringValue: "307831343032313046363442373838434239"
+              - key: sqlserver.query_plan
+                value:
+                  stringValue: ""
               - key: sqlserver.query_start
                 value:
                   stringValue: "2025-02-12T16:37:54.843+08:00"
@@ -117,9 +120,7 @@ resourceLogs:
                   stringValue: sa
             body: {}
             eventName: db.server.query_sample
-            spanId: ""
-            timeUnixNano: "1748221339132048638"
-            traceId: ""
+            timeUnixNano: "1768316833982422000"
         scope:
           name: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver
           version: latest
