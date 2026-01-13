@@ -915,6 +915,7 @@ func (s *sqlServerScraperHelper) recordDatabaseSampleQuery(ctx context.Context) 
 	const percentComplete = "percent_complete"
 	const queryHash = "query_hash"
 	const queryPlanHash = "query_plan_hash"
+	const queryPlan = "query_plan"
 	const queryStart = "query_start"
 	const reads = "reads"
 	const requestStatus = "request_status"
@@ -1024,6 +1025,10 @@ func (s *sqlServerScraperHelper) recordDatabaseSampleQuery(ctx context.Context) 
 			clientAddressVal = row[clientAddress]
 		}
 
+		queryPlanText := s.retrieveValue(row, queryPlan, &errs, func(row sqlquery.StringMap, columnName string) (any, error) {
+			return s.obfuscator.obfuscateXMLPlan(row[columnName])
+		})
+
 		s.lb.RecordDbServerQuerySampleEvent(
 			contextFromQuery,
 			timestamp, clientAddressVal, clientPortVal,
@@ -1034,7 +1039,7 @@ func (s *sqlServerScraperHelper) recordDatabaseSampleQuery(ctx context.Context) 
 			deadlockPriorityVal, estimatedCompletionTimeSecondVal,
 			lockTimeoutSecondVal, logicalReadsVal,
 			openTransactionCountVal, percentCompleteVal, queryHashVal, queryPlanHashVal,
-			queryStartVal, readsVal,
+			queryPlanText.(string), queryStartVal, readsVal,
 			requestStatusVal, rowCountVal,
 			sessionIDVal, sessionStatusVal,
 			totalElapsedTimeSecondVal, transactionIDVal, transactionIsolationLevelVal,

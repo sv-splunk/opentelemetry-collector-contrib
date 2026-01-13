@@ -592,6 +592,7 @@ query sample
 | sqlserver.percent_complete | Percentage of work completed. | Any Double |
 | sqlserver.query_hash | Binary hash value calculated on the query and used to identify queries with similar logic, reported in the HEX format. | Any Str |
 | sqlserver.query_plan_hash | Binary hash value calculated on the query execution plan and used to identify similar query execution plans, reported in the HEX format. | Any Str |
+| sqlserver.query_plan | The query execution plan used by the SQL Server. | Any Str |
 | sqlserver.query_start | Timestamp of when the SQL query started (ISO 8601 format). | Any Str |
 | sqlserver.reads | Number of physical reads performed by the query. | Any Int |
 | sqlserver.request_status | Status of the request (e.g., running, suspended). | Any Str |
