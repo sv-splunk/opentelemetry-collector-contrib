@@ -6,6 +6,8 @@ package mysqlreceiver // import "github.com/open-telemetry/opentelemetry-collect
 import (
 	"container/heap"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"math"
 	"sort"
@@ -741,21 +743,23 @@ func (m *mySQLScraper) scrapeTopQueries(now pcommon.Timestamp, errs *scrapererro
 			countStarVal = 0
 		}
 
-		obfuscatedQuery, err := m.obfuscator.obfuscateSQLString(q.digestText)
+		obfuscatedQuery, err := m.obfuscator.obfuscateSQLString(q.querySampleText)
 		if err != nil {
 			m.logger.Error("Failed to obfuscate query", zap.Error(err))
 		}
+
+		queryPlanCacheID := m.getQueryPlanCacheID(q.digest, obfuscatedQuery)
 
 		var queryPlan string
 		// querySampleText is "" when the fallback template was used (MySQL <8 / MariaDB).
 		// Skip EXPLAIN in that case — there is no sample statement to explain.
 		if q.digest != "" && q.querySampleText != "" {
-			queryPlan = m.retrieveQueryPlan(q.digestText, q.querySampleText, q.schemaName, q.digest)
+			queryPlan = m.retrieveQueryPlan(q.digestText, q.querySampleText, q.schemaName, q.digest, queryPlanCacheID)
 		}
 
 		queryPlanHash := ""
 		if queryPlan != "" {
-			queryPlanHash = q.digest
+			queryPlanHash = queryPlanCacheID
 		}
 
 		m.lb.RecordDbServerTopQueryEvent(
@@ -806,14 +810,16 @@ func (m *mySQLScraper) scrapeQuerySamples(_ context.Context, now pcommon.Timesta
 			}
 		}
 
+		queryPlanCacheID := m.getQueryPlanCacheID(sample.digest, obfuscatedQuery)
+
 		var queryPlan string
 		if sample.digest != "" {
-			queryPlan = m.retrieveQueryPlan(obfuscatedQuery, sample.sqlText, sample.processlistDB, sample.digest)
+			queryPlan = m.retrieveQueryPlan(obfuscatedQuery, sample.sqlText, sample.processlistDB, sample.digest, queryPlanCacheID)
 		}
 
 		queryPlanHash := ""
 		if queryPlan != "" {
-			queryPlanHash = sample.digest
+			queryPlanHash = queryPlanCacheID
 		}
 
 		m.lb.RecordDbServerQuerySampleEvent(
@@ -843,10 +849,18 @@ func (m *mySQLScraper) scrapeQuerySamples(_ context.Context, now pcommon.Timesta
 	}
 }
 
-func (m *mySQLScraper) retrieveQueryPlan(queryDigestText, querySampleText, schemaOrDbName, digest string) string {
+func (m *mySQLScraper) getQueryPlanCacheID(digest, sqlText string) string {
+	if !m.detectedVersion.supportsQuerySampleText() {
+		// Use the digestTextHash as plan key for MySQL versions < 8 and Mariadb since digest is not available consistently in those versions.
+		return getDigestTextHash(sqlText)
+	}
+	return digest
+}
+
+func (m *mySQLScraper) retrieveQueryPlan(queryDigestText, querySampleText, schemaOrDbName, digest, digestTextHash string) string {
 	var queryPlan string
 	var ok bool
-	cacheKey := createCacheKey(schemaOrDbName, digest)
+	cacheKey := createCacheKey(schemaOrDbName, digestTextHash)
 	if queryPlan, ok = m.queryPlanCache.Get(cacheKey); !ok {
 		// attempt to explain the query
 		queryPlan = m.sqlclient.explainQuery(queryDigestText, querySampleText, schemaOrDbName, digest, m.logger)
@@ -865,6 +879,11 @@ func (m *mySQLScraper) retrieveQueryPlan(queryDigestText, querySampleText, schem
 		m.queryPlanCache.Add(cacheKey, queryPlan)
 	}
 	return queryPlan
+}
+
+func getDigestTextHash(sqltext string) string {
+	sum := sha256.Sum256([]byte(sqltext))
+	return hex.EncodeToString(sum[:])
 }
 
 func createCacheKey(dbName, digest string) string {
