@@ -1124,7 +1124,10 @@ func TestSetupResourceBuilder(t *testing.T) {
 			settings := receivertest.NewNopSettings(metadata.Type)
 			scraper := newSQLServerScraper(
 				settings.ID,
-				"SELECT 1",
+				querySpec{
+					name:  queryGroupServerProperties,
+					query: "SELECT 1",
+				},
 				sqlquery.TelemetryConfig{},
 				func() (*sql.DB, error) { return nil, nil },
 				func(_ sqlquery.Db, _ string, _ *zap.Logger, _ sqlquery.TelemetryConfig) sqlquery.DbClient {

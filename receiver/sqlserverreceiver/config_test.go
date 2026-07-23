@@ -226,6 +226,10 @@ func TestLoadConfig(t *testing.T) {
 		expected.QuerySample = QuerySample{
 			MaxRowsPerQuery: 1450,
 		}
+		expected.CollectionGroups = CollectionGroupsConfig{
+			IndexPhysical:    CollectionGroupConfig{CollectionInterval: 30 * time.Minute},
+			ServerProperties: CollectionGroupConfig{CollectionInterval: 5 * time.Minute},
+		}
 
 		sub, err := cm.Sub("sqlserver/named")
 		require.NoError(t, err)

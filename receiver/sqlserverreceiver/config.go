@@ -20,6 +20,20 @@ type QuerySample struct {
 	_ struct{}
 }
 
+type CollectionGroupConfig struct {
+	CollectionInterval time.Duration `mapstructure:"collection_interval"`
+}
+
+type CollectionGroupsConfig struct {
+	AvailabilityGroup   CollectionGroupConfig `mapstructure:"availability_group"`
+	DatabaseIO          CollectionGroupConfig `mapstructure:"database_io"`
+	PerformanceCounters CollectionGroupConfig `mapstructure:"performance_counters"`
+	ServerProperties    CollectionGroupConfig `mapstructure:"server_properties"`
+	WaitStats           CollectionGroupConfig `mapstructure:"wait_stats"`
+	WorkerThreads       CollectionGroupConfig `mapstructure:"worker_threads"`
+	IndexPhysical       CollectionGroupConfig `mapstructure:"index_physical"`
+}
+
 type TopQueryCollection struct {
 	// Enabled enables the collection of the top queries by the execution time.
 	// It will collect the top N queries based on totalElapsedTimeDiffs during the last collection interval.
@@ -43,6 +57,8 @@ type Config struct {
 	// we are reporting them as logs.
 	// The `N` is configured via `TopQueryCount`
 	TopQueryCollection `mapstructure:"top_query_collection"`
+
+	CollectionGroups CollectionGroupsConfig `mapstructure:"collection_groups"`
 
 	QuerySample `mapstructure:"query_sample_collection"`
 
@@ -83,6 +99,10 @@ func (cfg *Config) Validate() error {
 		return errors.New("`top_query_collection.collection_interval` must not be less than 0")
 	}
 
+	if err := validateCollectionGroups(cfg); err != nil {
+		return err
+	}
+
 	cfg.isDirectDBConnectionEnabled, err = directDBConnectionEnabled(cfg)
 
 	return err
@@ -113,4 +133,48 @@ func (cfg *Config) EffectiveLookbackTime() time.Duration {
 		return 2 * cfg.TopQueryCollection.CollectionInterval
 	}
 	return cfg.LookbackTime
+}
+
+func (cfg *Config) effectiveCollectionInterval(group CollectionGroupConfig) time.Duration {
+	if group.CollectionInterval > 0 {
+		return group.CollectionInterval
+	}
+	return cfg.ControllerConfig.CollectionInterval
+}
+
+type collectionGroupValidation struct {
+	name     string
+	interval time.Duration
+}
+
+func validateCollectionGroups(cfg *Config) error {
+	groups := []collectionGroupValidation{
+		{"availability_group", cfg.CollectionGroups.AvailabilityGroup.CollectionInterval},
+		{"database_io", cfg.CollectionGroups.DatabaseIO.CollectionInterval},
+		{"performance_counters", cfg.CollectionGroups.PerformanceCounters.CollectionInterval},
+		{"server_properties", cfg.CollectionGroups.ServerProperties.CollectionInterval},
+		{"wait_stats", cfg.CollectionGroups.WaitStats.CollectionInterval},
+		{"worker_threads", cfg.CollectionGroups.WorkerThreads.CollectionInterval},
+		{"index_physical", cfg.CollectionGroups.IndexPhysical.CollectionInterval},
+	}
+
+	for _, group := range groups {
+		if err := validateCollectionGroup(group.name, group.interval, cfg.ControllerConfig.CollectionInterval); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateCollectionGroup(groupName string, groupInterval, receiverInterval time.Duration) error {
+	if groupInterval < 0 {
+		return errors.New("`collection_groups." + groupName + ".collection_interval` must not be less than 0")
+	}
+
+	if groupInterval > 0 && groupInterval < receiverInterval {
+		return errors.New("`collection_groups." + groupName + ".collection_interval` must be greater than or equal to the receiver `collection_interval`")
+	}
+
+	return nil
 }

@@ -1,4 +1,10 @@
 $defs:
+  collection_group:
+    type: object
+    properties:
+      collection_interval:
+        type: string
+        format: duration
   query_sample:
     type: object
     properties:
@@ -39,6 +45,23 @@ properties:
     type: string
   username:
     type: string
+  collection_groups:
+    type: object
+    properties:
+      availability_group:
+        $ref: collection_group
+      database_io:
+        $ref: collection_group
+      performance_counters:
+        $ref: collection_group
+      server_properties:
+        $ref: collection_group
+      wait_stats:
+        $ref: collection_group
+      worker_threads:
+        $ref: collection_group
+      index_physical:
+        $ref: collection_group
 allOf:
   - $ref: go.opentelemetry.io/collector/scraper/scraperhelper.controller_config
   - $ref: ./internal/metadata.metrics_builder_config

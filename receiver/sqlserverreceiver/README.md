@@ -72,6 +72,11 @@ sqlserver:
     collection_interval: 60s                   # collection interval for top query collection specifically
   query_sample_collection:                     # this collection exports the currently (relate to the query time) executing queries as logs
     max_rows_per_query: 100                    # the maximum number of samples to return for one single query.
+  collection_groups:                           # optional per-query collection intervals for direct SQL metric queries
+    index_physical:
+      collection_interval: 30m                 # expensive sys.dm_db_index_physical_stats query
+    server_properties:
+      collection_interval: 5m
 ```
 
 The following settings are optional:
@@ -108,6 +113,19 @@ Top-Query collection specific options (only useful when top-query collection are
 
 Query sample collection related options (only useful when query sample is enabled)
 - `max_rows_per_query`: (optional, default = `100`) use this to limit rows returned by the sampling query.
+
+Collection group options (only useful when direct SQL metric queries are enabled):
+- `collection_groups`: (optional) Configure collection cadence per SQL query group. Each group maps to one SQL query executed by the receiver. Omitted groups inherit the receiver `collection_interval`.
+  - `availability_group.collection_interval`: Availability group replica metrics query.
+  - `database_io.collection_interval`: Database I/O metrics query.
+  - `performance_counters.collection_interval`: Performance counter metrics query.
+  - `server_properties.collection_interval`: Server properties query (CPU count, database counts, uptime).
+  - `wait_stats.collection_interval`: Wait statistics query.
+  - `worker_threads.collection_interval`: Worker thread metrics query.
+  - `index_physical.collection_interval`: Index physical statistics query (`sys.dm_db_index_physical_stats`).
+  - Each group's `collection_interval` must be greater than or equal to the receiver `collection_interval` when set to a non-zero value. A value of `0` (default) inherits the receiver interval.
+  - Configuring a collection group does **not** enable metrics. Metric enablement is controlled separately under `metrics:`.
+
 Example:
 
 ```yaml

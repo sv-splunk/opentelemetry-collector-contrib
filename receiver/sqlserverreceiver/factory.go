@@ -64,36 +64,11 @@ func createDefaultConfig() component.Config {
 }
 
 func setupQueries(cfg *Config) []string {
-	var queries []string
-
-	if isAvailabilityGroupQueryEnabled(&cfg.Metrics) {
-		queries = append(queries, getSQLServerAvailabilityGroupQuery(cfg.InstanceName))
+	specs := setupQuerySpecs(cfg)
+	queries := make([]string, 0, len(specs))
+	for _, spec := range specs {
+		queries = append(queries, spec.query)
 	}
-
-	if isDatabaseIOQueryEnabled(&cfg.Metrics) {
-		queries = append(queries, getSQLServerDatabaseIOQuery(cfg.InstanceName))
-	}
-
-	if isPerfCounterQueryEnabled(&cfg.Metrics) {
-		queries = append(queries, getSQLServerPerformanceCounterQuery(cfg.InstanceName))
-	}
-
-	if cfg.Metrics.SqlserverDatabaseCount.Enabled || cfg.Metrics.SqlserverCPUCount.Enabled || cfg.Metrics.SqlserverComputerUptime.Enabled {
-		queries = append(queries, getSQLServerPropertiesQuery(cfg.InstanceName))
-	}
-
-	if isWaitStatsQueryEnabled(&cfg.Metrics) {
-		queries = append(queries, getSQLServerWaitStatsQuery(cfg.InstanceName))
-	}
-
-	if isWorkerThreadsQueryEnabled(&cfg.Metrics) {
-		queries = append(queries, getSQLServerWorkerThreadsQuery(cfg.InstanceName))
-	}
-
-	if isIndexPhysicalStatsQueryEnabled(&cfg.Metrics) {
-		queries = append(queries, getSQLServerIndexPhysicalStatsQuery(cfg.InstanceName))
-	}
-
 	return queries
 }
 
@@ -126,7 +101,7 @@ func setupSQLServerScrapers(params receiver.Settings, cfg *Config) []*sqlServerS
 		return nil
 	}
 
-	queries := setupQueries(cfg)
+	queries := setupQuerySpecs(cfg)
 	if len(queries) == 0 {
 		params.Logger.Info("No direct connection will be made to the SQL Server: No metrics are enabled requiring it.")
 		return nil
@@ -139,13 +114,13 @@ func setupSQLServerScrapers(params receiver.Settings, cfg *Config) []*sqlServerS
 	}
 
 	var scrapers []*sqlServerScraperHelper
-	for i, query := range queries {
-		id := component.NewIDWithName(metadata.Type, fmt.Sprintf("query-%d: %s", i, query))
+	for _, spec := range queries {
+		id := component.NewIDWithName(metadata.Type, fmt.Sprintf("query-%s", spec.name))
 
 		// lru only returns error when the size is less than 0
 		cache := newCache(1)
 
-		sqlServerScraper := newSQLServerScraper(id, query,
+		sqlServerScraper := newSQLServerScraper(id, spec,
 			sqlquery.TelemetryConfig{},
 			dbProviderFunc,
 			sqlquery.NewDbClient,
@@ -194,7 +169,7 @@ func setupSQLServerLogsScrapers(params receiver.Settings, cfg *Config) []*sqlSer
 			cache = newCache(1)
 		}
 
-		sqlServerScraper := newSQLServerScraper(id, query,
+		sqlServerScraper := newSQLServerLogsScraper(id, query,
 			sqlquery.TelemetryConfig{},
 			dbProviderFunc,
 			sqlquery.NewDbClient,

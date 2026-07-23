@@ -43,7 +43,10 @@ const (
 type sqlServerScraperHelper struct {
 	id                     component.ID
 	config                 *Config
+	queryGroup             queryGroupName
 	sqlQuery               string
+	collectionInterval     time.Duration
+	recordMetrics          func(*sqlServerScraperHelper, context.Context) error
 	instanceName           string
 	clientProviderFunc     sqlquery.ClientProviderFunc
 	dbProviderFunc         sqlquery.DbProviderFunc
@@ -55,6 +58,7 @@ type sqlServerScraperHelper struct {
 	lb                     *metadata.LogsBuilder
 	cache                  *lru.Cache[string, int64]
 	lastExecutionTimestamp time.Time
+	lastCollectionTime     time.Time
 	obfuscator             *obfuscator
 	serviceInstanceID      string
 }
@@ -65,7 +69,7 @@ var (
 )
 
 func newSQLServerScraper(id component.ID,
-	query string,
+	spec querySpec,
 	telemetry sqlquery.TelemetryConfig,
 	dbProviderFunc sqlquery.DbProviderFunc,
 	clientProviderFunc sqlquery.ClientProviderFunc,
@@ -83,7 +87,10 @@ func newSQLServerScraper(id component.ID,
 	return &sqlServerScraperHelper{
 		id:                     id,
 		config:                 cfg,
-		sqlQuery:               query,
+		queryGroup:             spec.name,
+		sqlQuery:               spec.query,
+		collectionInterval:     spec.collectionInterval,
+		recordMetrics:          spec.recordMetrics,
 		logger:                 params.Logger,
 		telemetry:              telemetry,
 		dbProviderFunc:         dbProviderFunc,
@@ -95,6 +102,23 @@ func newSQLServerScraper(id component.ID,
 		obfuscator:             newObfuscator(),
 		serviceInstanceID:      serviceInstanceID,
 	}
+}
+
+func newSQLServerLogsScraper(id component.ID,
+	query string,
+	telemetry sqlquery.TelemetryConfig,
+	dbProviderFunc sqlquery.DbProviderFunc,
+	clientProviderFunc sqlquery.ClientProviderFunc,
+	params receiver.Settings,
+	cfg *Config,
+	cache *lru.Cache[string, int64],
+) *sqlServerScraperHelper {
+	scraper := newSQLServerScraper(id, querySpec{
+		name:  "",
+		query: query,
+	}, telemetry, dbProviderFunc, clientProviderFunc, params, cfg, cache)
+	scraper.recordMetrics = nil
+	return scraper
 }
 
 func (s *sqlServerScraperHelper) ID() component.ID {
@@ -112,32 +136,37 @@ func (s *sqlServerScraperHelper) Start(context.Context, component.Host) error {
 	return nil
 }
 
-func (s *sqlServerScraperHelper) ScrapeMetrics(ctx context.Context) (pmetric.Metrics, error) {
-	var err error
+func (s *sqlServerScraperHelper) shouldCollect(now time.Time) bool {
+	if s.collectionInterval <= 0 || s.collectionInterval == s.config.ControllerConfig.CollectionInterval {
+		return true
+	}
 
-	switch s.sqlQuery {
-	case getSQLServerAvailabilityGroupQuery(s.config.InstanceName):
-		err = s.recordAvailabilityGroupMetrics(ctx)
-	case getSQLServerDatabaseIOQuery(s.config.InstanceName):
-		err = s.recordDatabaseIOMetrics(ctx)
-	case getSQLServerPerformanceCounterQuery(s.config.InstanceName):
-		err = s.recordDatabasePerfCounterMetrics(ctx)
-	case getSQLServerPropertiesQuery(s.config.InstanceName):
-		err = s.recordDatabaseStatusMetrics(ctx)
-	case getSQLServerWaitStatsQuery(s.config.InstanceName):
-		err = s.recordDatabaseWaitMetrics(ctx)
-	case getSQLServerWorkerThreadsQuery(s.config.InstanceName):
-		err = s.recordWorkerThreadMetrics(ctx)
-	case getSQLServerIndexPhysicalStatsQuery(s.config.InstanceName):
-		err = s.recordIndexPhysicalMetrics(ctx)
-	default:
+	if s.lastCollectionTime.IsZero() {
+		return true
+	}
+
+	return !now.Before(s.lastCollectionTime.Add(s.collectionInterval))
+}
+
+func (s *sqlServerScraperHelper) ScrapeMetrics(ctx context.Context) (pmetric.Metrics, error) {
+	now := time.Now()
+	if !s.shouldCollect(now) {
+		s.logger.Debug("Skipping query group collection because it is not yet due",
+			zap.String("query_group", string(s.queryGroup)),
+			zap.Duration("collection_interval", s.collectionInterval))
+		return pmetric.NewMetrics(), nil
+	}
+
+	if s.recordMetrics == nil {
 		return pmetric.Metrics{}, fmt.Errorf("Attempted to get metrics from unsupported query: %s", s.sqlQuery)
 	}
 
+	err := s.recordMetrics(s, ctx)
 	if err != nil {
 		return pmetric.Metrics{}, err
 	}
 
+	s.lastCollectionTime = now
 	return s.mb.Emit(), nil
 }
 

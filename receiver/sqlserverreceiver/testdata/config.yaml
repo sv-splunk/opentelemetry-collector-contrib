@@ -25,6 +25,11 @@ sqlserver/named:
     collection_interval: 80s
   query_sample_collection:
     max_rows_per_query: 1450
+  collection_groups:
+    index_physical:
+      collection_interval: 30m
+    server_properties:
+      collection_interval: 5m
   events:
     db.server.query_sample:
       enabled: true
